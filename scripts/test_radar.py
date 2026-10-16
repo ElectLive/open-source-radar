@@ -1290,6 +1290,29 @@ class HelperTests(unittest.TestCase):
         self.assertIn('labels: ["say \\"hi\\"","line\\nbreak"]', query)
         self.assertNotIn("line\nbreak", query)
 
+    def test_select_languages_matches_config_names_ignoring_case(self):
+        languages = {"Python": "python", "C++": "cpp", "Go": "go"}
+        selected, unknown = radar.select_languages(languages, "python,CPP")
+        self.assertEqual(selected, {"Python": "python", "C++": "cpp"})
+        self.assertEqual(unknown, [])
+
+    def test_select_languages_matches_slugs_ignoring_case(self):
+        languages = {"C#": "csharp", "R": "r"}
+        selected, unknown = radar.select_languages(languages, "CSHARP,r")
+        self.assertEqual(selected, {"C#": "csharp", "R": "r"})
+        self.assertEqual(unknown, [])
+
+    def test_select_languages_reports_unknown_entries_and_skips_blanks(self):
+        languages = {"Python": "python"}
+        selected, unknown = radar.select_languages(languages, " python , , brainfuck ")
+        self.assertEqual(selected, {"Python": "python"})
+        self.assertEqual(unknown, ["brainfuck"])
+
+    def test_select_languages_keeps_config_order(self):
+        languages = {"Python": "python", "Go": "go", "Rust": "rust"}
+        selected, _ = radar.select_languages(languages, "rust,python")
+        self.assertEqual(list(selected), ["Python", "Rust"])
+
 
 class LanguageQuickstartsInSyncTests(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent

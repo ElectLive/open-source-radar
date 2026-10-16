@@ -1014,6 +1014,34 @@ def update_readme_stats(
 # --------------------------------------------------------------------------- #
 
 
+def select_languages(languages: dict[str, str], selection: str) -> tuple[dict[str, str], list[str]]:
+    """Pick the configured languages named by ``selection``.
+
+    Every comma-separated entry matches either the configured display name or its
+    slug, ignoring case, so ``--languages python,CPP`` and ``--languages "Python,cpp"``
+    select the same two languages. Entries that match nothing are returned so the
+    caller can warn about them instead of silently selecting an empty subset.
+    """
+    lookup: dict[str, str] = {}
+    for name, slug in languages.items():
+        lookup.setdefault(name.casefold(), name)
+        lookup.setdefault(slug.casefold(), name)
+
+    wanted: set[str] = set()
+    unknown: list[str] = []
+    for entry in selection.split(","):
+        token = entry.strip()
+        if not token:
+            continue
+        name = lookup.get(token.casefold())
+        if name is None:
+            unknown.append(token)
+        else:
+            wanted.add(name)
+    # Keep the configured order rather than the order the names were typed in.
+    return {name: slug for name, slug in languages.items() if name in wanted}, unknown
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", choices=["discover", "fetch", "render", "all"])
@@ -1025,8 +1053,10 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config()
     if args.languages:
-        wanted = {name.strip() for name in args.languages.split(",")}
-        config["languages"] = {name: slug for name, slug in config["languages"].items() if name in wanted}
+        selected, unknown = select_languages(config["languages"], args.languages)
+        if unknown:
+            print(f"warning: ignoring unknown language(s): {', '.join(unknown)}", file=sys.stderr)
+        config["languages"] = selected
     token = os.environ.get("GITHUB_TOKEN", "")
 
     if args.command in ("discover", "all"):
